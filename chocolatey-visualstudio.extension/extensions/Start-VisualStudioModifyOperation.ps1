@@ -7,42 +7,42 @@
         [Parameter(Mandatory = $true)] [string] $VisualStudioYear,
         [Parameter(Mandatory = $true)] [string[]] $ApplicableProducts,
         [Parameter(Mandatory = $true)] [string[]] $OperationTexts,
-        [ValidateSet('modify', 'uninstall')] [string] $Operation = 'modify',
-        [string] $InstallerPath
+        [ValidateSet('modify', 'uninstall', 'update')] [string] $Operation = 'modify',
+        [version] $RequiredProductVersion,
+        [hashtable] $PackageParameters,
+        [string] $BootstrapperUrl,
+        [string] $BootstrapperChecksum,
+        [string] $BootstrapperChecksumType,
+        [PSObject] $ProductReference
     )
-    Write-Debug "Running 'Start-VisualStudioModifyOperation' with PackageName:'$PackageName' ArgumentList:'$ArgumentList' VisualStudioYear:'$VisualStudioYear' ApplicableProducts:'$ApplicableProducts' OperationTexts:'$OperationTexts' Operation:'$Operation' InstallerPath:'$InstallerPath'";
+    Write-Debug "Running 'Start-VisualStudioModifyOperation' with PackageName:'$PackageName' ArgumentList:'$ArgumentList' VisualStudioYear:'$VisualStudioYear' ApplicableProducts:'$ApplicableProducts' OperationTexts:'$OperationTexts' Operation:'$Operation' RequiredProductVersion:'$RequiredProductVersion' BootstrapperUrl:'$BootstrapperUrl' BootstrapperChecksum:'$BootstrapperChecksum' BootstrapperChecksumType:'$BootstrapperChecksumType'";
+
+    Wait-VSInstallerProcesses -Behavior 'Fail'
 
     $frobbed, $frobbing, $frobbage = $OperationTexts
 
-    if ($InstallerPath -eq '')
+    if ($PackageParameters -eq $null)
     {
-        $InstallerPath = Get-VSUninstallerExePath `
-                            -PackageName $PackageName `
-                            -UninstallerName 'vs_installer.exe' `
-                            -ProgramsAndFeaturesDisplayName "Microsoft Visual Studio $VisualStudioYear" `
-                            -AssumeNewVS2017Installer
-
-        if ($InstallerPath -eq $null)
-        {
-            throw "Unable to determine the location of the Visual Studio Installer. Is Visual Studio $VisualStudioYear installed?"
-        }
+        $PackageParameters = Parse-Parameters $env:chocolateyPackageParameters
     }
-
-    $packageParameters = Parse-Parameters $env:chocolateyPackageParameters
+    else
+    {
+        $PackageParameters = $PackageParameters.Clone()
+    }
 
     for ($i = 0; $i -lt $ArgumentList.Length; $i += 2)
     {
-        $packageParameters[$ArgumentList[$i]] = $ArgumentList[$i + 1]
+        $PackageParameters[$ArgumentList[$i]] = $ArgumentList[$i + 1]
     }
 
-    $packageParameters['norestart'] = ''
-    if (-not $packageParameters.ContainsKey('quiet') -and -not $packageParameters.ContainsKey('passive'))
+    $PackageParameters['norestart'] = ''
+    if (-not $PackageParameters.ContainsKey('quiet') -and -not $PackageParameters.ContainsKey('passive'))
     {
-        $packageParameters['quiet'] = ''
+        $PackageParameters['quiet'] = ''
     }
 
     # --no-foo cancels --foo
-    $negativeSwitches = $packageParameters.GetEnumerator() | Where-Object { $_.Key -match '^no-.' -and $_.Value -eq '' } | Select-Object -ExpandProperty Key
+    $negativeSwitches = $PackageParameters.GetEnumerator() | Where-Object { $_.Key -match '^no-.' -and $_.Value -eq '' } | Select-Object -ExpandProperty Key
     foreach ($negativeSwitch in $negativeSwitches)
     {
         if ($negativeSwitch -eq $null)
@@ -50,31 +50,31 @@
             continue
         }
 
-        $packageParameters.Remove($negativeSwitch.Substring(3))
-        $packageParameters.Remove($negativeSwitch)
+        $PackageParameters.Remove($negativeSwitch.Substring(3))
+        $PackageParameters.Remove($negativeSwitch)
     }
 
-    $argumentSets = ,$packageParameters
-    if ($packageParameters.ContainsKey('installPath'))
+    $argumentSets = ,$PackageParameters
+    if ($PackageParameters.ContainsKey('installPath'))
     {
-        if ($packageParameters.ContainsKey('productId'))
+        if ($PackageParameters.ContainsKey('productId'))
         {
             Write-Warning 'Parameter issue: productId is ignored when installPath is specified.'
         }
 
-        if ($packageParameters.ContainsKey('channelId'))
+        if ($PackageParameters.ContainsKey('channelId'))
         {
             Write-Warning 'Parameter issue: channelId is ignored when installPath is specified.'
         }
     }
-    elseif ($packageParameters.ContainsKey('productId'))
+    elseif ($PackageParameters.ContainsKey('productId'))
     {
-        if (-not $packageParameters.ContainsKey('channelId'))
+        if (-not $PackageParameters.ContainsKey('channelId'))
         {
             throw "Parameter error: when productId is specified, channelId must be specified, too."
         }
     }
-    elseif ($packageParameters.ContainsKey('channelId'))
+    elseif ($PackageParameters.ContainsKey('channelId'))
     {
         throw "Parameter error: when channelId is specified, productId must be specified, too."
     }
@@ -88,15 +88,15 @@
 
         if ($Operation -eq 'modify')
         {
-            if ($packageParameters.ContainsKey('add'))
+            if ($PackageParameters.ContainsKey('add'))
             {
-                $packageIdsList = $packageParameters['add']
+                $packageIdsList = $PackageParameters['add']
                 $unwantedPackageSelector = { $productInfo.selectedPackages.ContainsKey($_) }
                 $unwantedStateDescription = 'contains'
             }
-            elseif ($packageParameters.ContainsKey('remove'))
+            elseif ($PackageParameters.ContainsKey('remove'))
             {
-                $packageIdsList = $packageParameters['remove']
+                $packageIdsList = $PackageParameters['remove']
                 $unwantedPackageSelector = { -not $productInfo.selectedPackages.ContainsKey($_) }
                 $unwantedStateDescription = 'does not contain'
             }
@@ -105,7 +105,7 @@
                 throw "Unsupported scenario: neither 'add' nor 'remove' is present in parameters collection"
             }
         }
-        elseif ($Operation -eq 'uninstall')
+        elseif (@('uninstall', 'update') -contains $Operation)
         {
             $packageIdsList = ''
             $unwantedPackageSelector = { $false }
@@ -136,7 +136,15 @@
 
             if (-not $applicable)
             {
-                Write-Verbose ('Product at path ''{0}'' will not be modified because it does not support package(s): {1}' -f $productInfo.installationPath, $packageIds)
+                if (($packageIds | Measure-Object).Count -gt 0)
+                {
+                    Write-Verbose ('Product at path ''{0}'' will not be modified because it does not support package(s): {1}' -f $productInfo.installationPath, $packageIds)
+                }
+                else
+                {
+                    Write-Verbose ('Product at path ''{0}'' will not be modified because it is not present on the list of applicable products: {1}' -f $productInfo.installationPath, $ApplicableProducts)
+                }
+
                 continue
             }
 
@@ -147,12 +155,29 @@
                 continue
             }
 
-            $argumentSet = $packageParameters.Clone()
+            if ($RequiredProductVersion -ne $null)
+            {
+                $existingProductVersion = [version]$productInfo.installationVersion
+                if ($existingProductVersion -lt $RequiredProductVersion)
+                {
+                    Write-Warning ('Product at path ''{0}'' will not be modified because its version ({1}) is lower than the required minimum ({2}). Please update the product first and reinstall this package.' -f $productInfo.installationPath, $existingProductVersion, $RequiredProductVersion)
+                    continue
+                }
+                else
+                {
+                    Write-Verbose ('Product at path ''{0}'' will be modified because its version ({1}) satisfies the version requirement of {2} or higher.' -f $productInfo.installationPath, $existingProductVersion, $RequiredProductVersion)
+                }
+            }
+
+            $argumentSet = $PackageParameters.Clone()
             $argumentSet['installPath'] = $productInfo.installationPath
+            $argumentSet['__internal_productReference'] = New-VSProductReference -ChannelId $productInfo.channelId -ProductId $productInfo.productid -ChannelUri $productInfo.channelUri -InstallChannelUri $productInfo.installChannelUri
             $argumentSets += $argumentSet
         }
     }
 
+    $installer = $null
+    $installerUpdated = $false
     $overallExitCode = 0
     foreach ($argumentSet in $argumentSets)
     {
@@ -165,6 +190,60 @@
             Write-Debug "Modifying Visual Studio product: [productId = '$($argumentSet.productId)' channelId = '$($argumentSet.channelId)']"
         }
 
+        $thisProductReference = $ProductReference
+        if ($argumentSet.ContainsKey('__internal_productReference'))
+        {
+            $thisProductReference = $argumentSet['__internal_productReference']
+            $argumentSet.Remove('__internal_productReference')
+        }
+
+        $shouldFixInstaller = $false
+        if ($installer -eq $null)
+        {
+            $installer = Get-VisualStudioInstaller
+            if ($installer -eq $null)
+            {
+                $shouldFixInstaller = $true
+            }
+            else
+            {
+                $health = $installer | Get-VisualStudioInstallerHealth
+                $shouldFixInstaller = -not $health.IsHealthy
+            }
+        }
+
+        if ($shouldFixInstaller -or ($Operation -ne 'uninstall' -and -not $installerUpdated))
+        {
+            $useInstallChannelUri = $Operation -ne 'update'
+            if ($PSCmdlet.ShouldProcess("Visual Studio Installer", "update"))
+            {
+                Assert-VSInstallerUpdated -PackageName $PackageName -PackageParameters $PackageParameters -ProductReference $thisProductReference -Url $BootstrapperUrl -Checksum $BootstrapperChecksum -ChecksumType $BootstrapperChecksumType -UseInstallChannelUri:$useInstallChannelUri
+                $installerUpdated = $true
+                $shouldFixInstaller = $false
+                $installer = Get-VisualStudioInstaller
+            }
+        }
+
+        if ($installer -eq $null)
+        {
+            throw 'The Visual Studio Installer is not present. Unable to continue.'
+        }
+
+        # TODO: Resolve-VSLayoutPath and auto add --installLayoutPath
+
+        $blacklist = @('bootstrapperPath')
+        $parametersToRemove = $argumentSet.Keys | Where-Object { $blacklist -contains $_ }
+        foreach ($parameterToRemove in $parametersToRemove)
+        {
+            if ($parameterToRemove -eq $null)
+            {
+                continue
+            }
+
+            Write-Debug "Filtering out package parameter not passed to the VS Installer: '$parameterToRemove'"
+            $argumentSet.Remove($parameterToRemove)
+        }
+
         foreach ($kvp in $argumentSet.Clone().GetEnumerator())
         {
             if ($kvp.Value -match '^(([^"].*\s)|(\s))')
@@ -175,9 +254,14 @@
 
         $silentArgs = $Operation + (($argumentSet.GetEnumerator() | ForEach-Object { ' --{0} {1}' -f $_.Key, $_.Value }) -join '')
         $exitCode = -1
-        if ($PSCmdlet.ShouldProcess("Executable: $InstallerPath", "Start with arguments: $silentArgs"))
+        if ($PSCmdlet.ShouldProcess("Executable: $($installer.Path)", "Start with arguments: $silentArgs"))
         {
-            $exitCode = Start-VSChocolateyProcessAsAdmin -statements $silentArgs -exeToRun $InstallerPath -validExitCodes @(0, 3010)
+            $exitCode = Start-VSChocolateyProcessAsAdmin -statements $silentArgs -exeToRun $installer.Path -validExitCodes @(0, 3010)
+            $auxExitCode = Wait-VSInstallerProcesses -Behavior 'Wait'
+            if ($auxExitCode -ne $null -and $exitCode -eq 0)
+            {
+                $exitCode = $auxExitCode
+            }
         }
 
         if ($overallExitCode -eq 0)

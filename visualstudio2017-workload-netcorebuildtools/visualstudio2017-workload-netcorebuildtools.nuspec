@@ -1,11 +1,11 @@
 ﻿<?xml version="1.0"?>
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
   <metadata>
-    <id>visualstudio2017-workload-webbuildtools</id>
-    <version>1.2.0-dev</version>
-    <packageSourceUrl>https://github.com/jberezanski/ChocolateyPackages/tree/master/visualstudio2017-workload-webbuildtools</packageSourceUrl>
+    <id>visualstudio2017-workload-netcorebuildtools</id>
+    <version>1.1.0-dev</version>
+    <packageSourceUrl>https://github.com/jberezanski/ChocolateyPackages/tree/master/visualstudio2017-workload-netcorebuildtools</packageSourceUrl>
     <owners>jberezanski</owners>
-    <title>Web development build tools workload for Visual Studio 2017 Build Tools</title>
+    <title>.NET Core build tools workload for Visual Studio 2017 Build Tools</title>
     <authors>Microsoft</authors>
     <projectUrl>https://www.visualstudio.com/vs/</projectUrl>
     <iconUrl>https://cdn.rawgit.com/jberezanski/ChocolateyPackages/17d25f2fb8a31d40b93a696e345c22a77913418f/icons/vs2017.png</iconUrl>
@@ -14,14 +14,14 @@
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <docsUrl>https://docs.microsoft.com/en-us/visualstudio/welcome-to-visual-studio</docsUrl>
     <bugTrackerUrl>https://visualstudio.uservoice.com/forums/121579-visual-studio</bugTrackerUrl>
-    <tags>microsoft visual studio visualstudio vs 2017 workload .net build tools web development msbuild admin</tags>
-    <summary>MSBuild tasks and targets for building web applications.</summary>
+    <tags>microsoft visual studio visualstudio vs 2017 workload .net core build tools msbuild admin</tags>
+    <summary>Tools for building .NET Core applications.</summary>
     <description>
 ### Overview
 
-This package adds the Web development build tools workload to an existing installation of Visual Studio 2017 Build Tools.
+This package adds the .NET Core build tools workload to an existing installation of Visual Studio 2017 Build Tools.
 
-The list of components included in this workload is shown [here](https://www.visualstudio.com/en-us/productinfo/vs2017-install-product-BuildTools.workloads#web-development-build-tools).
+The list of components included in this workload is shown [here](https://docs.microsoft.com/en-us/visualstudio/install/workload-component-id-vs-build-tools).
 
 Visual Studio 2017 Build Tools must be installed first, for example using the Chocolatey package [visualstudio2017buildtools](https://chocolatey.org/packages/visualstudio2017buildtools).
 
@@ -36,25 +36,23 @@ By default, the package installs components required by and recommended for the 
 
 Example 1. Installing the workload, including recommended, but not optional components:
 
-    choco install visualstudio2017-workload-webbuildtools --package-parameters "--includeRecommended"
+    choco install visualstudio2017-workload-netcorebuildtools --package-parameters "--includeRecommended"
 
 Example 2. Installing the workload, including all recommended and optional components:
 
-    choco install visualstudio2017-workload-webbuildtools --package-parameters "--includeOptional"
+    choco install visualstudio2017-workload-netcorebuildtools --package-parameters "--includeOptional"
 
 Example 3. Installing the workload, including only required components:
 
-    choco install visualstudio2017-workload-webbuildtools --package-parameters "--no-includeRecommended"
+    choco install visualstudio2017-workload-netcorebuildtools --package-parameters "--no-includeRecommended"
     </description>
     <releaseNotes>
 ##### Software
 [Visual Studio 2017 release notes](https://www.visualstudio.com/en-us/news/releasenotes/vs2017-relnotes)
-##### Package
-1.1.0: Updated metadata and dependencies to Visual Studio 2017 RTM.
     </releaseNotes>
     <dependencies>
       <dependency id="chocolatey-visualstudio.extension" version="1.6.0-dev" />
-      <dependency id="visualstudio2017buildtools" version="15.0" />
+      <dependency id="visualstudio2017buildtools" version="15.3" />
     </dependencies>
   </metadata>
 </package>

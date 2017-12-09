@@ -19,10 +19,12 @@
         installationPath = 'installationPath'
         installationVersion = 'installationVersion'
         channelId = 'channelId'
+        channelUri = 'channelUri'
         productId = 'product"\s*:\s*{\s*"id'
     }
     $optionalProductProperties = @{
         nickname = 'nickname'
+        installChannelUri = 'installChannelUri'
     }
     $propertyNameSelector = (($expectedProductProperties.Values + $optionalProductProperties.Values) | ForEach-Object { "($_)" }) -join '|'
     $regexTextBasicInfo = '"(?<name>{0})"\s*:\s*"(?<value>[^\"]+)"' -f $propertyNameSelector

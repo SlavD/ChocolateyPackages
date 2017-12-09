@@ -39,7 +39,8 @@ Install-ChocolateyPackage
       [ValidateSet('MsiVS2015OrEarlier', 'WillowVS2017OrLater')] [string] $InstallerTechnology,
       [string] $ProgramsAndFeaturesDisplayName = $ApplicationName,
       [string] $VisualStudioYear,
-      [string] $Product
+      [string] $Product,
+      [switch] $AllowUpdate
     )
     if ($Env:ChocolateyPackageDebug -ne $null)
     {
@@ -47,26 +48,42 @@ Install-ChocolateyPackage
         $DebugPreference = 'Continue'
         Write-Warning "VerbosePreference and DebugPreference set to Continue due to the presence of ChocolateyPackageDebug environment variable"
     }
-    Write-Debug "Running 'Install-VisualStudio' for $PackageName with ApplicationName:'$ApplicationName' Url:'$Url' Checksum:$Checksum ChecksumType:$ChecksumType InstallerTechnology:'$InstallerTechnology' ProgramsAndFeaturesDisplayName:'$ProgramsAndFeaturesDisplayName' VisualStudioYear:'$VisualStudioYear' Product:'$Product'";
+    Write-Debug "Running 'Install-VisualStudio' for $PackageName with ApplicationName:'$ApplicationName' Url:'$Url' Checksum:$Checksum ChecksumType:$ChecksumType InstallerTechnology:'$InstallerTechnology' ProgramsAndFeaturesDisplayName:'$ProgramsAndFeaturesDisplayName' VisualStudioYear:'$VisualStudioYear' Product:'$Product' AllowUpdate:'$AllowUpdate'";
 
     $packageParameters = Parse-Parameters $env:chocolateyPackageParameters
     $creatingLayout = $packageParameters.ContainsKey('layout')
     $assumeNewVS2017Installer = $InstallerTechnology -eq 'WillowVS2017OrLater'
+
+    if ($VisualStudioYear -ne '' -and $Product -ne '')
+    {
+        $productReference = Get-VSProductReference -VisualStudioYear $VisualStudioYear -Product $Product
+    }
+    else
+    {
+        $productReference = $null
+    }
 
     if (-not $creatingLayout)
     {
         if ($assumeNewVS2017Installer)
         {
             # there is a single Programs and Features entry for all products, so its presence is not enough
-            if ($VisualStudioYear -ne '' -and $Product -ne '')
+            if ($productReference -ne $null)
             {
-                $prodRef = Get-VSProductReference -VisualStudioYear $VisualStudioYear -Product $Product
-                $products = Get-WillowInstalledProducts | Where-Object { $_ -ne $null -and $_.channelId -eq $prodRef.ChannelId -and $_.productId -eq $prodRef.ProductId }
+                $products = Get-WillowInstalledProducts | Where-Object { $_ -ne $null -and $_.channelId -eq $productReference.ChannelId -and $_.productId -eq $productReference.ProductId }
                 $productsCount = ($products | Measure-Object).Count
-                Write-Verbose ("Found {0} installed Visual Studio product(s) with ChannelId = {1} and ProductId = {2}" -f $productsCount, $prodRef.ChannelId, $prodRef.ProductId)
+                Write-Verbose ("Found {0} installed Visual Studio product(s) with ChannelId = {1} and ProductId = {2}" -f $productsCount, $productReference.ChannelId, $productReference.ProductId)
                 if ($productsCount -gt 0)
                 {
-                    Write-Warning "$ApplicationName is already installed. Please use the Visual Studio Installer to modify or repair it."
+                    if ($AllowUpdate)
+                    {
+                        Start-VisualStudioModifyOperation -PackageName $PackageName -ArgumentList @() -VisualStudioYear $VisualStudioYear -ApplicableProducts @($Product) -OperationTexts @('update', 'updating', 'update') -Operation 'update' -PackageParameters $packageParameters -BootstrapperUrl $Url -BootstrapperChecksum $Checksum -BootstrapperChecksumType $ChecksumType -ProductReference $productReference
+                    }
+                    else
+                    {
+                        Write-Warning "$ApplicationName is already installed. Please use the Visual Studio Installer to modify or repair it."
+                    }
+
                     return
                 }
             }
@@ -100,6 +117,11 @@ Install-ChocolateyPackage
 
         $logFilePath = Join-Path $Env:TEMP "${PackageName}.log"
         Write-Debug "Log file path: $logFilePath"
+    }
+
+    if ($assumeNewVS2017Installer)
+    {
+        Assert-VSInstallerUpdated -PackageName $PackageName -PackageParameters $packageParameters -ProductReference $productReference -Url $Url -Checksum $Checksum -ChecksumType $ChecksumType
     }
 
     if ($packageParameters.ContainsKey('bootstrapperPath'))
