@@ -9,6 +9,7 @@
         [Parameter(Mandatory = $true)] [string[]] $OperationTexts,
         [ValidateSet('modify', 'uninstall', 'update')] [string] $Operation = 'modify',
         [version] $RequiredProductVersion,
+        [version] $DesiredProductVersion,
         [hashtable] $PackageParameters,
         [string] $BootstrapperUrl,
         [string] $BootstrapperChecksum,
@@ -160,14 +161,15 @@
                 $existingProductVersion = [version]$productInfo.installationVersion
                 if ($existingProductVersion -lt $RequiredProductVersion)
                 {
-                    Write-Warning ('Product at path ''{0}'' will not be modified because its version ({1}) is lower than the required minimum ({2}). Please update the product first and reinstall this package.' -f $productInfo.installationPath, $existingProductVersion, $RequiredProductVersion)
-                    continue
+                    throw ('Product at path ''{0}'' will not be modified because its version ({1}) is lower than the required minimum ({2}). Please update the product first and reinstall this package.' -f $productInfo.installationPath, $existingProductVersion, $RequiredProductVersion)
                 }
                 else
                 {
                     Write-Verbose ('Product at path ''{0}'' will be modified because its version ({1}) satisfies the version requirement of {2} or higher.' -f $productInfo.installationPath, $existingProductVersion, $RequiredProductVersion)
                 }
             }
+
+            # TODO if $DesiredProductVersion is not null, check if product already at $DesiredProductVersion or later and skip it in that case
 
             $argumentSet = $PackageParameters.Clone()
             $argumentSet['installPath'] = $productInfo.installationPath
@@ -178,6 +180,7 @@
 
     $installer = $null
     $installerUpdated = $false
+    $channelCacheCleared = $false
     $overallExitCode = 0
     foreach ($argumentSet in $argumentSets)
     {
@@ -229,9 +232,21 @@
             throw 'The Visual Studio Installer is not present. Unable to continue.'
         }
 
-        # TODO: Resolve-VSLayoutPath and auto add --installLayoutPath
+        if ($Operation -ne 'uninstall' -and -not $channelCacheCleared)
+        {
+            # this works around concurrency issues in recent VS Installer versions (1.14.x),
+            # which lead to product updates not being detected
+            # due to the VS Installer failing to update the cached manifests (file in use)
+            if ($PSCmdlet.ShouldProcess("Visual Studio Installer channel cache", "clear"))
+            {
+                Clear-VSChannelCache
+                $channelCacheCleared = $true
+            }
+        }
 
-        $blacklist = @('bootstrapperPath')
+        # TODO: Resolve-VSLayoutPath and auto add --layoutPath
+
+        $blacklist = @('bootstrapperPath', 'installLayoutPath')
         $parametersToRemove = $argumentSet.Keys | Where-Object { $blacklist -contains $_ }
         foreach ($parameterToRemove in $parametersToRemove)
         {
@@ -262,6 +277,8 @@
             {
                 $exitCode = $auxExitCode
             }
+
+            # TODO: if update, Resolve-VSProductInstance, get current version, compare with $DesiredProductVersion and throw if not updated
         }
 
         if ($overallExitCode -eq 0)
