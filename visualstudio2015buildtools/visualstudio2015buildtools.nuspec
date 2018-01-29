@@ -1,0 +1,46 @@
+﻿<?xml version="1.0"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
+  <metadata>
+    <id>visualstudio2015buildtools</id>
+    <version>2015.0.1</version>
+    <packageSourceUrl>https://github.com/SlavD/ChocolateyPackages/tree/master/visualstudio2015buildtools</packageSourceUrl>
+    <owners>slavd</owners>
+    <title>Visual Studio 2015 Build Tools</title>
+    <authors>Microsoft</authors>
+    <projectUrl>https://www.microsoft.com/en-us/download/details.aspx?id=48159</projectUrl>
+    <iconUrl>https://cdn.rawgit.com/jberezanski/ChocolateyPackages/17d25f2fb8a31d40b93a696e345c22a77913418f/icons/vs2015.png</iconUrl>
+    <copyright>http://www.microsoft.com/about/legal/en/us/IntellectualProperty/Copyright/Default.aspx</copyright>
+    <licenseUrl>https://www.visualstudio.com/license-terms/mlt687465/</licenseUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <docsUrl>https://docs.microsoft.com/en-us/visualstudio/welcome-to-visual-studio</docsUrl>
+    <bugTrackerUrl>https://visualstudio.uservoice.com/forums/121579-visual-studio</bugTrackerUrl>
+    <tags>microsoft visual studio visualstudio vs 2015 build tools admin</tags>
+    <summary>Build Tools allow you to build native and managed MSBuild-based applications without requiring the Visual Studio IDE.</summary>
+    <description>
+      ### Overview
+
+      These Build Tools allow you to build native and managed MSBuild-based applications without requiring the Visual Studio IDE. There are options to install the Visual C++ compilers and libraries, MFC, ATL, and C++/CLI support.
+
+      To find out what's new or to see the known issues, see the [Visual Studio 2015 Release Notes](http://www.visualstudio.com/news/vs2015-vs).
+      [System requirements](https://www.visualstudio.com/en-us/productinfo/vs2015-compatibility-vs)
+
+      ### Notes
+
+      A reboot may be required after (or even _before_) installing/uninstalling this package.
+      If control over reboots is required, it is advisable to install the dependencies (esp. dotnet4.6.1 or later) first, perform a reboot if necessary, and then install this package.
+    </description>
+    <releaseNotes>
+      ##### Software
+      [Visual Studio 2015 release notes](http://www.visualstudio.com/news/vs2015-vs)
+      ##### Package
+
+    </releaseNotes>
+    <dependencies>
+      <dependency id="chocolatey-visualstudio.extension" version="1.4.0" />
+      <dependency id="KB2919355" version="1.0.20160915" />
+      <!-- for Win8.1/2012R2 -->
+      <dependency id="KB2999226" version="1.0.20161201" />
+      <dependency id="dotnet4.6.1" version="4.6.01055.20161213" />
+    </dependencies>
+  </metadata>
+</package>
